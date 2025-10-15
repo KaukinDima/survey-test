@@ -1,0 +1,503 @@
+<!doctype html>
+<html lang="ru">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Интерактивная карта — Единый драфт</title>
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    .map-pan {
+      transition: transform 400ms ease, background 300ms ease;
+    }
+
+    .poly {
+      transition: all 250ms ease;
+    }
+
+    .poly.active {
+      stroke: #ef4444;
+      stroke-width: 3;
+      filter: drop-shadow(0 0 8px rgba(239, 68, 68, .6));
+    }
+
+    .chip {
+      transition: all 150ms ease;
+    }
+
+    .chip:hover {
+      transform: translateY(-1px);
+    }
+  </style>
+</head>
+
+<body class="bg-slate-50 text-slate-800">
+  <!-- Top bar -->
+  <header class="border-b bg-white sticky top-0 z-50">
+    <div class="mx-auto max-w-7xl px-4 py-3 flex items-center gap-3">
+      <div class="text-xl font-semibold">Интерактивная карта Костанайской области</div>
+      <span class="ml-auto hidden md:flex items-center gap-2 text-sm text-slate-500">
+        Draft • PHP→Django • RU/KZ
+      </span>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-7xl px-4 py-6 grid grid-cols-12 gap-4">
+    <!-- Sidebar -->
+    <aside class="col-span-12 lg:col-span-3 flex flex-col gap-4">
+      <!-- Search -->
+      <div class="bg-white rounded-2xl shadow p-3">
+        <div class="text-sm font-medium mb-2">Поиск по вопросам</div>
+        <div class="relative">
+          <input id="q" type="search" placeholder="введите слово или код вопроса…"
+            class="w-full rounded-xl border border-slate-200 px-3 py-2 pr-9 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          <button id="goSearch"
+            class="absolute right-1 top-1.5 px-3 py-1.5 text-sm rounded-lg bg-indigo-600 text-white">Найти</button>
+        </div>
+        <p class="mt-2 text-xs text-slate-500">Результат: авто-переход к блоку, сохранится выбранный регион.</p>
+      </div>
+
+      <!-- Regions -->
+      <div class="bg-white rounded-2xl shadow p-3">
+        <div class="flex items-center justify-between">
+          <div class="text-sm font-medium">Территории</div>
+          <button id="resetAll" class="text-xs px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200">Сбросить
+            всё</button>
+        </div>
+        <ul id="regionList" class="mt-2 space-y-1 text-sm max-h-80 overflow-auto">
+          <li><button data-region="kostanay" class="w-full text-left px-2 py-1 rounded-lg hover:bg-slate-100">г.
+              Костанай</button></li>
+          <li><button data-region="arkalyk" class="w-full text-left px-2 py-1 rounded-lg hover:bg-slate-100">Аркалык
+              г.а.</button></li>
+          <li><button data-region="lisakovsk" class="w-full text-left px-2 py-1 rounded-lg hover:bg-slate-100">Лисаковск
+              г.а.</button></li>
+          <li><button data-region="rudny" class="w-full text-left px-2 py-1 rounded-lg hover:bg-slate-100">Рудный
+              г.а.</button></li>
+          <li><button data-region="amangel"
+              class="w-full text-left px-2 py-1 rounded-lg hover:bg-slate-100">Амангельдинский</button></li>
+          <li><button data-region="zhitikara"
+              class="w-full text-left px-2 py-1 rounded-lg hover:bg-slate-100">Житикаринский</button></li>
+          <!-- … добавьте остальные районы -->
+        </ul>
+      </div>
+
+      <!-- Sections -->
+      <div class="bg-white rounded-2xl shadow p-3">
+        <div class="text-sm font-medium mb-2">Разделы</div>
+        <nav id="sections" class="space-y-1 text-sm">
+          <a href="#sec-socdemo" class="block px-2 py-1 rounded-lg hover:bg-slate-100">1. Соц.-демографические</a>
+          <a href="#sec-wellbeing" class="block px-2 py-1 rounded-lg hover:bg-slate-100">2. Соц.-экономическое
+            самочувствие</a>
+          <a href="#sec-interethnic" class="block px-2 py-1 rounded-lg hover:bg-slate-100">3. Межэтнические
+            отношения</a>
+          <a href="#sec-policy" class="block px-2 py-1 rounded-lg hover:bg-slate-100">4. Поддержка гос. политики</a>
+          <a href="#sec-migration" class="block px-2 py-1 rounded-lg hover:bg-slate-100">5. Миграционные настроения</a>
+          <a href="#sec-border" class="block px-2 py-1 rounded-lg hover:bg-slate-100">6. Приграничные районы</a>
+          <a href="#sec-media" class="block px-2 py-1 rounded-lg hover:bg-slate-100">7. Медиа-мониторинг</a>
+        </nav>
+      </div>
+    </aside>
+
+    <!-- Content -->
+    <section class="col-span-12 lg:col-span-9 space-y-4">
+      <!-- Global filter bar -->
+      <div class="bg-white rounded-2xl shadow p-3">
+        <div class="flex flex-wrap items-center gap-2">
+          <div class="text-sm font-medium mr-2">Фильтры:</div>
+
+          <!-- region chip -->
+          <div id="chipRegion"
+            class="hidden chip flex items-center gap-1 px-2 py-1 rounded-full bg-rose-50 text-rose-700 text-xs">
+            <span class="font-medium">Регион:</span><span id="chipRegionName">—</span>
+            <button class="ml-1 px-1 rounded hover:bg-rose-100" onclick="setRegion(null)">×</button>
+          </div>
+
+          <!-- Wave -->
+          <label class="chip inline-flex items-center gap-2 px-2 py-1 rounded-full bg-slate-100 text-xs">
+            Волна:
+            <select id="wave" class="bg-transparent outline-none">
+              <option value="2025Q3">2025Q3</option>
+              <option value="2025Q4">2025Q4</option>
+              <option value="2025M07">2025-07</option>
+              <option value="2025M08">2025-08</option>
+              <option value="2025M09">2025-09</option>
+            </select>
+          </label>
+
+          <!-- Demographic filters -->
+          <label class="chip inline-flex items-center gap-2 px-2 py-1 rounded-full bg-slate-100 text-xs">
+            Пол:
+            <select id="fGender" class="bg-transparent outline-none">
+              <option value="">Все</option>
+              <option value="m">Мужчины</option>
+              <option value="f">Женщины</option>
+            </select>
+          </label>
+          <label class="chip inline-flex items-center gap-2 px-2 py-1 rounded-full bg-slate-100 text-xs">
+            Возраст:
+            <select id="fAge" class="bg-transparent outline-none">
+              <option value="">Все</option>
+              <option value="18-29">18–29</option>
+              <option value="30-45">30–45</option>
+              <option value="46-60">46–60</option>
+              <option value="61+">61+</option>
+            </select>
+          </label>
+          <label class="chip inline-flex items-center gap-2 px-2 py-1 rounded-full bg-slate-100 text-xs">
+            Тип местности:
+            <select id="fUrban" class="bg-transparent outline-none">
+              <option value="">Все</option>
+              <option value="urban">Город</option>
+              <option value="rural">Село</option>
+            </select>
+          </label>
+
+          <button id="btnExport" class="ml-auto text-xs px-3 py-1.5 rounded-lg bg-slate-900 text-white">Экспорт
+            (CSV/PDF)</button>
+        </div>
+      </div>
+
+      <!-- Map block -->
+      <div class="bg-white rounded-2xl shadow p-3">
+        <div class="flex items-center justify-between mb-2">
+          <div class="text-sm font-medium">Карта (демо)</div>
+          <div class="text-xs text-slate-500">Клик по городу = зум + подсветка + фильтр</div>
+        </div>
+
+        <!-- SVG карта (заглушка) -->
+        <div id="mapWrap"
+          class="relative overflow-hidden rounded-xl border border-slate-200 h-72 bg-[url('https://tile.openstreetmap.org/5/27/14.png')] bg-cover map-pan">
+          <svg id="mapSvg" viewBox="0 0 600 300" class="absolute inset-0 w-full h-full">
+            <rect x="0" y="0" width="600" height="300" fill="rgba(244, 63, 94, 0.06)"></rect>
+            <g fill="rgba(255,255,255,.7)" stroke="#9ca3af">
+              <path id="poly-kostanay" data-region="kostanay" class="poly cursor-pointer"
+                d="M220,120 L280,110 L300,150 L260,180 L220,160 Z" />
+              <path id="poly-arkalyk" data-region="arkalyk" class="poly cursor-pointer"
+                d="M120,70 L160,60 L180,90 L150,120 L110,100 Z" />
+              <path id="poly-lisakovsk" data-region="lisakovsk" class="poly cursor-pointer"
+                d="M360,80 L400,70 L420,100 L390,120 L350,100 Z" />
+              <path id="poly-rudny" data-region="rudny" class="poly cursor-pointer"
+                d="M300,50 L330,40 L350,60 L330,85 L300,70 Z" />
+            </g>
+          </svg>
+          <!-- Tooltip -->
+          <div id="tooltip"
+            class="hidden absolute z-10 px-2 py-1 text-xs rounded bg-white border border-slate-200 shadow">
+            <div class="font-medium" id="tt-name">Название</div>
+            <div class="text-slate-500">Население: <span id="tt-pop">—</span></div>
+            <div class="text-slate-500">Ключевой индикатор: <span id="tt-kpi">—</span></div>
+          </div>
+        </div>
+        <p class="mt-2 text-xs text-slate-500">В проде будет Leaflet/MapLibre + PostGIS, плавный перелёт и подсветка.
+        </p>
+      </div>
+
+      <!-- Sections / Charts -->
+      <section id="sec-socdemo" class="bg-white rounded-2xl shadow p-3">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-medium">1. Социально-демографические</h2>
+          <button class="text-xs px-2 py-1 rounded bg-slate-100" onclick="downloadPNG('donutChart')">PNG</button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+          <div class="rounded-xl border border-slate-200 p-3">
+            <div class="text-xs text-slate-500 mb-1">Семейное положение</div>
+            <canvas id="donutChart" class="w-full h-56"></canvas>
+          </div>
+          <div class="rounded-xl border border-slate-200 p-3">
+            <div class="text-xs text-slate-500 mb-1">Распределение по полу</div>
+            <canvas id="barChartSex" class="w-full h-56"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <section id="sec-wellbeing" class="bg-white rounded-2xl shadow p-3">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-medium">2. Соц.-экономическое самочувствие</h2>
+          <button class="text-xs px-2 py-1 rounded bg-slate-100" onclick="downloadPNG('lineChart')">PNG</button>
+        </div>
+        <div class="mt-2 rounded-xl border border-slate-200 p-3">
+          <div class="text-xs text-slate-500 mb-1">Доверие (динамика за 3 года)</div>
+          <canvas id="lineChart" class="w-full h-56"></canvas>
+        </div>
+      </section>
+
+      <section id="sec-policy" class="bg-white rounded-2xl shadow p-3">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-medium">4. Поддержка государственной политики</h2>
+          <button class="text-xs px-2 py-1 rounded bg-slate-100" onclick="downloadPNG('barChartTrust')">PNG</button>
+        </div>
+        <div class="mt-2 rounded-xl border border-slate-200 p-3">
+          <div class="text-xs text-slate-500 mb-1">Доверие к институтам</div>
+          <canvas id="barChartTrust" class="w-full h-56"></canvas>
+        </div>
+      </section>
+
+      <section id="sec-media" class="bg-white rounded-2xl shadow p-3">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-medium">7. Медиа-мониторинг (публичные источники)</h2>
+          <button class="text-xs px-2 py-1 rounded bg-slate-100" onclick="fakeExport()">Экспорт CSV</button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+          <div class="rounded-xl border border-slate-200 p-3">
+            <div class="text-xs text-slate-500 mb-1">Динамика публикаций</div>
+            <canvas id="mediaLine" class="w-full h-56"></canvas>
+          </div>
+          <div class="rounded-xl border border-slate-200 p-3">
+            <div class="text-xs text-slate-500 mb-1">Тональность по темам</div>
+            <canvas id="mediaBar" class="w-full h-56"></canvas>
+          </div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    /* ======= DEMO DATA & STATE ======= */
+    const regionMeta = {
+      kostanay: { name: "г. Костанай", pop: "246 000", kpi: "Доверие 62%" },
+      ratyn: { name: "—", pop: "—", kpi: "—" }, // reserved
+      lekileyo: { name: "—", pop: "—", kpi: "—" }, // reserved
+      ariko: { name: "—", pop: "—", kpi: "—" }, // reserved
+      irikare: { name: "—", pop: "—", kpi: "—" }, // reserved
+      ngokuphela: { name: "—", pop: "—", kpi: "—" }, // reserved
+      arkalyk: { name: "Аркалык г.а.", pop: "29 000", kpi: "Доверие 55%" },
+      lisakovsk: { name: "Лисаковск г.а.", pop: "36 000", kpi: "Доверие 57%" },
+      rudny: { name: "Рудный г.а.", pop: "114 000", kpi: "Доверие 60%" },
+      amangel: { name: "Амангельдинский", pop: "—", kpi: "—" },
+      zhitikara: { name: "Житикаринский", pop: "—", kpi: "—" },
+    };
+
+    const base = {
+      donut: [45, 35, 12, 8],                    // семейное положение
+      sexBar: [49, 51],                          // мужчины/женщины
+      trustBar: [62, 55, 48, 37],                // акимат, маслихат, СМИ, НПО
+      trustLine: [54, 57, 59, 61, 60, 62, 63],         // динамика
+      mediaLine: [30, 42, 38, 45, 50, 47, 55, 60, 58, 62, 66, 70],
+      mediaBar: [40, 35, 25],                      // позитив/нейтрал/негатив
+      labels: {
+        trustLine: ['2023 Q3', '2023 Q4', '2024 Q1', '2024 Q2', '2024 Q3', '2024 Q4', '2025 Q1'],
+        mediaLine: ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'],
+      }
+    };
+
+    // Простая функция модификации данных под регион/фильтры (демо)
+    function mutateByState(arr, state) {
+      const { region, wave, gender, age, urban } = state;
+      let k = 1.0;
+      if (region === 'kostanay') k *= 1.05;
+      if (region === 'arkalyk') k *= 0.95;
+      if (region === 'rudny') k *= 1.03;
+      if (urban === 'urban') k *= 1.02;
+      if (urban === 'rural') k *= 0.98;
+      if (gender === 'm') k *= 1.01;
+      if (gender === 'f') k *= 0.99;
+      if (wave && wave.includes('Q4')) k *= 1.02;
+      return arr.map(v => Math.max(0, +(v * k).toFixed(1)));
+    }
+
+    const state = {
+      region: null,
+      wave: '2025Q3',
+      gender: '',
+      age: '',
+      urban: ''
+    };
+
+    /* ======= CHARTS INIT ======= */
+    let donutChart, barChartSex, lineChart, barChartTrust, mediaLine, mediaBar;
+
+    function initCharts() {
+      const donutCtx = document.getElementById('donutChart');
+      donutChart = new Chart(donutCtx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Женаты/замужем', 'Холостые', 'Разведены', 'Вдовы/вдовцы'],
+          datasets: [{ data: base.donut, backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444'] }]
+        },
+        options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+      });
+
+      barChartSex = new Chart(document.getElementById('barChartSex'), {
+        type: 'bar',
+        data: {
+          labels: ['Мужчины', 'Женщины'],
+          datasets: [{ label: 'Доля (%)', data: base.sexBar, backgroundColor: ['#6366f1', '#22c55e'] }]
+        },
+        options: { responsive: true, scales: { y: { beginAtZero: true, max: 100 } } }
+      });
+
+      lineChart = new Chart(document.getElementById('lineChart'), {
+        type: 'line',
+        data: {
+          labels: base.labels.trustLine,
+          datasets: [{
+            label: 'Доверие (%)',
+            data: base.trustLine,
+            borderColor: '#10b981',
+            backgroundColor: 'rgba(16,185,129,0.25)',
+            fill: true, tension: 0.3
+          }]
+        },
+        options: { responsive: true, scales: { y: { beginAtZero: true, max: 100 } } }
+      });
+
+      barChartTrust = new Chart(document.getElementById('barChartTrust'), {
+        type: 'bar',
+        data: {
+          labels: ['Акимат', 'Маслихат', 'СМИ', 'НПО'],
+          datasets: [{ label: 'Доверие (%)', data: base.trustBar, backgroundColor: '#3b82f6' }]
+        },
+        options: { responsive: true, scales: { y: { beginAtZero: true, max: 100 } } }
+      });
+
+      mediaLine = new Chart(document.getElementById('mediaLine'), {
+        type: 'line',
+        data: {
+          labels: base.labels.mediaLine,
+          datasets: [{
+            label: 'Публикации',
+            data: base.mediaLine,
+            borderColor: '#6366f1',
+            backgroundColor: 'rgba(99,102,241,0.25)',
+            fill: true, tension: 0.3
+          }]
+        },
+        options: { responsive: true, scales: { y: { beginAtZero: true } } }
+      });
+
+      mediaBar = new Chart(document.getElementById('mediaBar'), {
+        type: 'bar',
+        data: {
+          labels: ['Позитив', 'Нейтрал', 'Негатив'],
+          datasets: [{ label: 'Доля (%)', data: base.mediaBar, backgroundColor: ['#10b981', '#94a3b8', '#ef4444'] }]
+        },
+        options: { responsive: true, scales: { y: { beginAtZero: true, max: 100 } } }
+      });
+    }
+
+    function updateCharts() {
+      const s = { ...state };
+      donutChart.data.datasets[0].data = mutateByState(base.donut, s);
+      donutChart.update();
+
+      barChartSex.data.datasets[0].data = mutateByState(base.sexBar, s);
+      barChartSex.update();
+
+      lineChart.data.datasets[0].data = mutateByState(base.trustLine, s);
+      lineChart.update();
+
+      barChartTrust.data.datasets[0].data = mutateByState(base.trustBar, s);
+      barChartTrust.update();
+
+      mediaLine.data.datasets[0].data = mutateByState(base.mediaLine, s);
+      mediaLine.update();
+
+      mediaBar.data.datasets[0].data = mutateByState(base.mediaBar, s);
+      mediaBar.update();
+    }
+
+    /* ======= UI WIRING ======= */
+    const url = new URL(window.location);
+    const $chipRegion = document.getElementById('chipRegion');
+    const $chipRegionName = document.getElementById('chipRegionName');
+
+    // restore from URL
+    const initialRegion = url.searchParams.get('region');
+    const initialWave = url.searchParams.get('wave');
+    if (initialRegion) setRegion(initialRegion, false);
+    if (initialWave) { state.wave = initialWave; document.getElementById('wave').value = initialWave; }
+
+    // Region list
+    document.getElementById('regionList').addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-region]');
+      if (!btn) return;
+      setRegion(btn.dataset.region, true);
+    });
+
+    // Map polygons
+    document.getElementById('mapSvg').addEventListener('click', (e) => {
+      const poly = e.target.closest('[data-region]');
+      if (!poly) return;
+      setRegion(poly.dataset.region, true);
+    });
+
+    // Tooltip on hover
+    const tooltip = document.getElementById('tooltip');
+    document.getElementById('mapSvg').addEventListener('mousemove', (e) => {
+      const poly = e.target.closest('[data-region]');
+      if (!poly) { tooltip.classList.add('hidden'); return; }
+      const r = poly.dataset.region;
+      const m = regionMeta[r] || { name: "—", pop: "—", kpi: "—" };
+      tooltip.querySelector('#tt-name').textContent = m.name;
+      tooltip.querySelector('#tt-pop').textContent = m.pop;
+      tooltip.querySelector('#tt-kpi').textContent = m.kpi;
+      tooltip.style.left = (e.offsetX + 12) + 'px';
+      tooltip.style.top = (e.offsetY + 12) + 'px';
+      tooltip.classList.remove('hidden');
+    });
+
+    // Reset
+    document.getElementById('resetAll').addEventListener('click', () => {
+      setRegion(null, true);
+      document.getElementById('wave').selectedIndex = 0;
+      ['fGender', 'fAge', 'fUrban'].forEach(id => document.getElementById(id).value = '');
+      state.wave = '2025Q3'; state.gender = ''; state.age = ''; state.urban = '';
+      updateCharts();
+    });
+
+    // Search → jump
+    document.getElementById('goSearch').addEventListener('click', () => {
+      document.getElementById('sec-socdemo').scrollIntoView({ behavior: 'smooth' });
+    });
+
+    // Filters
+    document.getElementById('wave').addEventListener('change', (e) => { state.wave = e.target.value; syncUrl(); updateCharts(); });
+    document.getElementById('fGender').addEventListener('change', (e) => { state.gender = e.target.value; updateCharts(); });
+    document.getElementById('fAge').addEventListener('change', (e) => { state.age = e.target.value; updateCharts(); });
+    document.getElementById('fUrban').addEventListener('change', (e) => { state.urban = e.target.value; updateCharts(); });
+
+    // Export (demo)
+    function fakeExport() { alert('Экспорт CSV (демо): в проде будет генерация файла на сервере.'); }
+    function downloadPNG(canvasId) {
+      const link = document.createElement('a');
+      link.download = `${canvasId}.png`;
+      link.href = document.getElementById(canvasId).toDataURL('image/png');
+      link.click();
+    }
+    window.fakeExport = fakeExport;
+    window.downloadPNG = downloadPNG;
+
+    // Region selection + URL sync
+    function setRegion(region, updateUrl = true) {
+      state.region = region || null;
+      document.querySelectorAll('#mapSvg .poly').forEach(p => p.classList.toggle('active', p.dataset.region === region));
+      const wrap = document.getElementById('mapWrap');
+      wrap.style.transform = region ? 'scale(1.03)' : 'scale(1)';
+
+      if (region) {
+        $chipRegion.classList.remove('hidden');
+        $chipRegionName.textContent = (regionMeta[region]?.name) || region;
+      } else {
+        $chipRegion.classList.add('hidden');
+      }
+      if (updateUrl) syncUrl();
+      updateCharts();
+    }
+
+    function syncUrl() {
+      const u = new URL(window.location);
+      if (state.region) u.searchParams.set('region', state.region); else u.searchParams.delete('region');
+      if (state.wave) u.searchParams.set('wave', state.wave); else u.searchParams.delete('wave');
+      history.replaceState(null, '', u.toString());
+    }
+
+    // Init
+    initCharts();
+    updateCharts();
+  </script>
+</body>
+
+</html>
