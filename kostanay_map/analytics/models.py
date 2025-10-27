@@ -56,6 +56,7 @@ class Survey(models.Model):
     """
     title = models.CharField(max_length=255)
     is_frontier = models.BooleanField(default=False)  # corresponds to your surveyFrontier/surveyBase split
+    wave = models.ForeignKey(SurveyWave, on_delete=models.CASCADE, related_name="surveys")
 
     def __str__(self):
         return self.title

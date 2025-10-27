@@ -41,23 +41,36 @@ class SurveyWaveViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
 
 
 class SurveyViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
-    queryset = Survey.objects.all().order_by("id")
+    queryset = Survey.objects.select_related("wave").all().order_by("id")
     serializer_class = SurveySerializer
     permission_classes = [AllowAny]
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        wave_code = self.request.query_params.get("wave_code")
+        if wave_code:
+            qs = qs.filter(wave__code=wave_code)
+        return qs
+
     @action(detail=False, methods=["get"], permission_classes=[AllowAny])
     def current(self, request):
-        # placeholder: return all; frontend filters by quarter index
+        """Вернёт все Survey (фронт сам фильтрует по wave_code при желании)"""
         return Response(self.get_serializer(self.get_queryset(), many=True).data)
 
-
 class QuestionViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
-    queryset = Question.objects.all().order_by("survey_id", "sort_order")
+    queryset = Question.objects.select_related("survey", "survey__wave").all()
     serializer_class = QuestionSerializer
     permission_classes = [AllowAny]
-    filter_backends = [DjangoFilterBackend]
-    filterset_fields = ("survey", "category", "code")
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        survey_id = self.request.query_params.get("survey_id")
+        if survey_id:
+            qs = qs.filter(survey_id=survey_id)
+        q = self.request.query_params.get("q")
+        if q:
+            qs = qs.filter(models.Q(text__icontains=q) | models.Q(code__icontains=q))
+        return qs.order_by("sort_order", "id")
 
 class MetricViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     queryset = Metric.objects.all().order_by("code")
