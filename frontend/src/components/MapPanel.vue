@@ -6,9 +6,7 @@
       <span v-if="activeCity" class="text-xs text-indigo-700 font-semibold">
         {{ getActiveCityName }}
       </span>
-      <span v-else class="text-xs text-slate-400">
-        Клик по району
-      </span>
+      <span v-else class="text-xs text-slate-400">Клик по району</span>
     </div>
     <div ref="mapEl" id="map" class="w-full h-[480px] rounded-xl border border-slate-200"></div>
   </div>
@@ -24,12 +22,6 @@ export default {
     cities: { type: Array, default: () => [] },
     activeCity: { type: String, default: null },
   },
-  computed: {
-    getActiveCityName() {
-      const city = this.cities.find(c => c.slug === this.activeCity);
-      return city ? `Выбран город: ${city.name}` : "";
-    },
-  },
   data() {
     return {
       map: null,
@@ -43,32 +35,41 @@ export default {
       ],
     };
   },
+  computed: {
+    getActiveCityName() {
+      const city = this.cities.find(c => c.slug === this.activeCity);
+      return city ? `Выбран город: ${city.name}` : "";
+    },
+  },
   watch: {
     cities: { handler() { this.renderAll(); }, deep: true },
     activeCity() { this.highlightActive(); },
   },
   mounted() {
     this.map = L.map(this.$refs.mapEl, { zoomControl: true }).setView([53.2, 63.6], 6);
-
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 18,
       attribution: "© OpenStreetMap",
     }).addTo(this.map);
-
     this.renderAll();
   },
   methods: {
     parseFeature(f) {
       if (!f) return null;
       if (typeof f === "string") {
-        try { return JSON.parse(f); } catch { return null; }
+        try { return JSON.parse(f); } catch (e) {
+          console.warn("❌ Невалидный GeoJSON (строка):", f);
+          return null;
+        }
       }
-      return f;
+      if (typeof f === "object" && f.type && f.coordinates) return f;
+      console.warn("❌ Невалидный GeoJSON (объект):", f);
+      return null;
     },
 
     clearMap() {
       this.map.eachLayer(layer => {
-        if (layer instanceof L.TileLayer) return; // оставляем OSM
+        if (layer instanceof L.TileLayer) return;
         this.map.removeLayer(layer);
       });
       this.cityLayers = {};
@@ -79,7 +80,6 @@ export default {
       if (!this.map || !this.cities.length) return;
       this.clearMap();
 
-      // 1️⃣ Область (фон)
       const oblast = this.cities.find(c => c.is_oblast);
       if (oblast) {
         const feat = this.parseFeature(oblast.feature);
@@ -96,7 +96,6 @@ export default {
         }
       }
 
-      // 2️⃣ Районы
       const districts = this.cities
         .filter(c => !c.is_oblast)
         .slice()
@@ -117,15 +116,8 @@ export default {
           },
         });
 
-        // hover-подсветка без tooltip
-        layer.on("mouseover", (e) => {
-          e.target.setStyle({ weight: 3.5, opacity: 1 });
-        });
-        layer.on("mouseout", (e) => {
-          e.target.setStyle({ weight: 2, opacity: 1 });
-        });
-
-        // клик — выбор города
+        layer.on("mouseover", e => e.target.setStyle({ weight: 3.5 }));
+        layer.on("mouseout", e => e.target.setStyle({ weight: 2 }));
         layer.on("click", () => this.$emit("select-city", city.slug));
 
         layer.addTo(this.map);
@@ -141,14 +133,12 @@ export default {
     highlightActive() {
       if (!this.map) return;
 
-      // сброс стилей
       Object.entries(this.cityLayers).forEach(([slug, layer]) => {
         const idx = Object.keys(this.cityLayers).indexOf(slug);
         const color = this.outlineColors[idx % this.outlineColors.length];
         layer.setStyle({ color, weight: 2, fillOpacity: 0 });
       });
 
-      // выделение выбранного
       const activeLayer = this.activeCity && this.cityLayers[this.activeCity];
       if (activeLayer) {
         activeLayer.setStyle({
@@ -176,16 +166,9 @@ export default {
   contain: layout paint;
 }
 .leaflet-marker-icon,
-.leaflet-marker-shadow {
-  display: none !important;
-}
-
+.leaflet-marker-shadow,
 .leaflet-tooltip,
 .city-tooltip {
-  display: none !important;
-}
-
-.leaflet-marker-icon {
   display: none !important;
 }
 </style>

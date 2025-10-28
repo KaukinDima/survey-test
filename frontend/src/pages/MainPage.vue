@@ -30,7 +30,6 @@
           :active-city="activeCity"
           @select-city="selectCity"
         />
-
         <QuestionsPanel
           :questions="questions"
           :loading="questionsLoading"
@@ -111,6 +110,7 @@ export default {
           city: this.activeCity,
         });
         this.questions = response;
+        console.log('this.questions:', this.questions,);
       } catch (e) {
         console.error("questions error", e);
       } finally {
