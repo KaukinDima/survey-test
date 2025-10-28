@@ -72,6 +72,65 @@ class QuestionViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
             qs = qs.filter(models.Q(text__icontains=q) | models.Q(code__icontains=q))
         return qs.order_by("sort_order", "id")
 
+class QuestionGroupedViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
+    queryset = Question.objects.select_related("survey", "survey__wave").all()
+    permission_classes = [AllowAny]
+
+    def list(self, request, *args, **kwargs):
+        wave_code = request.query_params.get("wave")
+        survey_id = request.query_params.get("survey_id")
+        city_slug = request.query_params.get("city")
+
+        qs = Question.objects.select_related("survey", "survey__wave")
+        if survey_id:
+            qs = qs.filter(survey_id=survey_id)
+        if wave_code:
+            qs = qs.filter(survey__wave__code=wave_code)
+
+        result = []
+
+        for q in qs:
+            datapoints = (
+                DataPoint.objects
+                .select_related("city", "option", "metric")
+                .filter(question=q)
+            )
+            if wave_code:
+                datapoints = datapoints.filter(wave__code=wave_code)
+            if city_slug:
+                datapoints = datapoints.filter(city__slug=city_slug)
+
+            city_data = {}
+            metric_name = None
+            metric_unit = None
+
+            for dp in datapoints:
+                city = dp.city.name if dp.city else "—"
+                if city not in city_data:
+                    city_data[city] = {}
+                if dp.option:
+                    city_data[city][dp.option.label] = float(dp.value)
+                if not metric_name:
+                    metric_name = dp.metric.name
+                    metric_unit = dp.metric.unit
+
+            city_values = []
+            for city, values in city_data.items():
+                row = {"city": city}
+                row.update(values)
+                city_values.append(row)
+
+            result.append({
+                "id": q.id,
+                "question": q.text,
+                "category": q.category,
+                "metric_name": metric_name or "",
+                "metric_unit": metric_unit or "",
+                "city_values": city_values,
+            })
+
+        return Response(result)
+
 class MetricViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     queryset = Metric.objects.all().order_by("code")
     serializer_class = MetricSerializer

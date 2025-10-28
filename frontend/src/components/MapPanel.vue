@@ -2,9 +2,12 @@
 <template>
   <div class="bg-white rounded-2xl shadow p-3">
     <div class="text-sm font-medium mb-2 flex justify-between items-center">
-      <span>Карта (Leaflet)</span>
-      <span class="text-xs text-slate-400">
-        Клик по району = выделение
+      <span>Карта</span>
+      <span v-if="activeCity" class="text-xs text-indigo-700 font-semibold">
+        {{ getActiveCityName }}
+      </span>
+      <span v-else class="text-xs text-slate-400">
+        Клик по району
       </span>
     </div>
     <div ref="mapEl" id="map" class="w-full h-[480px] rounded-xl border border-slate-200"></div>
@@ -20,6 +23,12 @@ export default {
   props: {
     cities: { type: Array, default: () => [] },
     activeCity: { type: String, default: null },
+  },
+  computed: {
+    getActiveCityName() {
+      const city = this.cities.find(c => c.slug === this.activeCity);
+      return city ? `Выбран город: ${city.name}` : "";
+    },
   },
   data() {
     return {
@@ -166,8 +175,11 @@ export default {
 #map {
   contain: layout paint;
 }
+.leaflet-marker-icon,
+.leaflet-marker-shadow {
+  display: none !important;
+}
 
-/* отключаем названия/подсказки */
 .leaflet-tooltip,
 .city-tooltip {
   display: none !important;

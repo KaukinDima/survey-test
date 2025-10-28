@@ -7,6 +7,7 @@
     />
 
     <main class="mx-auto max-w-7xl px-4 py-6 grid grid-cols-12 gap-4">
+      <!-- Сайдбар -->
       <Sidebar
         class="col-span-12 lg:col-span-3"
         :cities="cities"
@@ -22,16 +23,19 @@
         @scroll-to="scrollTo"
       />
 
+      <!-- Основная панель -->
       <div class="col-span-12 lg:col-span-9 space-y-4">
-      <MapPanel
-        :cities="cities"
-        :active-city="activeCity"
-        @select-city="selectCity"
-      />
+        <MapPanel
+          :cities="cities"
+          :active-city="activeCity"
+          @select-city="selectCity"
+        />
 
         <QuestionsPanel
           :questions="questions"
           :loading="questionsLoading"
+          :active-city="activeCity"
+          :cities="cities"
         />
       </div>
     </main>
@@ -43,7 +47,7 @@ import HeaderBar from "@/components/HeaderBar.vue";
 import Sidebar from "@/components/Sidebar.vue";
 import MapPanel from "@/components/MapPanel.vue";
 import QuestionsPanel from "@/components/QuestionsPanel.vue";
-import { fetchCities, fetchSurveysByWaveCode, searchQuestions } from "@/composables/useApi";
+import { fetchCities, fetchSurveysByWaveCode, fetchGroupedQuestions } from "@/composables/useApi";
 
 export default {
   name: "MainPage",
@@ -57,35 +61,40 @@ export default {
       activeCity: null,
       defaultRegionSlug: "kostanayskaya-oblast",
 
-      sections: [],          // здесь лежат surveys текущей волны
-      currentSurveyId: null, // выбранный survey (раздел)
+      sections: [],
+      currentSurveyId: null,
 
       search: "",
       questions: [],
       questionsLoading: false,
     };
   },
+
   async mounted() {
     await this.loadCities();
     const oblast = this.cities.find(c => c.slug === this.defaultRegionSlug);
     if (oblast) this.activeCity = oblast.slug;
 
-    await this.loadSections();            // загрузим surveys для currentQuarter
+    await this.loadSections();
     if (this.sections.length) {
-      this.currentSurveyId = this.sections[0].id; // по умолчанию первый раздел
+      this.currentSurveyId = this.sections[0].id;
     }
+
     await this.loadQuestions();
   },
+
   methods: {
     async loadCities() {
-      try { this.cities = await fetchCities(); }
-      catch (e) { console.error("cities error", e); }
+      try {
+        this.cities = await fetchCities();
+      } catch (e) {
+        console.error("cities error", e);
+      }
     },
 
     async loadSections() {
       try {
         const surveys = await fetchSurveysByWaveCode(this.currentQuarter);
-        // ожидаем [{id, title, is_frontier, wave}] из SurveySerializer
         this.sections = Array.isArray(surveys) ? surveys : [];
       } catch (e) {
         console.error("surveys error", e);
@@ -96,29 +105,29 @@ export default {
     async loadQuestions() {
       this.questionsLoading = true;
       try {
-        this.questions = await searchQuestions({
-          surveyId: this.currentSurveyId,
-          q: this.search,
+        const response = await fetchGroupedQuestions({
+          wave: this.currentQuarter,
+          survey_id: this.currentSurveyId,
+          city: this.activeCity,
         });
+        this.questions = response;
       } catch (e) {
         console.error("questions error", e);
-        this.questions = [];
       } finally {
         this.questionsLoading = false;
       }
     },
-
     async onQuarterChange(code) {
       this.currentQuarter = code;
       await this.loadSections();
-      // сбросим выбранный раздел на первый по волне
       this.currentSurveyId = this.sections[0]?.id || null;
       await this.loadQuestions();
     },
 
     async selectCity(slug) {
       this.activeCity = slug;
-      await this.loadQuestions(); // (если нужно — позже добавим фильтр по city в API)
+      // фильтрация по городу (опционально)
+      await this.loadQuestions();
     },
 
     async selectSection(surveyId) {
@@ -128,7 +137,6 @@ export default {
 
     async resetAll() {
       this.search = "";
-      // не трогаем выбранный раздел/город
       await this.loadQuestions();
     },
 

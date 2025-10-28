@@ -19,12 +19,21 @@
     <div class="bg-white rounded-2xl shadow p-3">
       <div class="flex items-center justify-between">
         <div class="text-sm font-medium">Территории</div>
-        <button @click="$emit('reset-all')" class="text-xs px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200">Сбросить всё</button>
+        <button
+          @click="$emit('reset-all')"
+          class="text-xs px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200"
+        >
+          Сбросить всё
+        </button>
       </div>
       <ul class="mt-2 space-y-1 text-sm max-h-80 overflow-auto">
         <li v-for="c in cities" :key="c.slug">
           <button
-            class="w-full text-left px-2 py-1 rounded-lg hover:bg-slate-100"
+            class="w-full text-left px-2 py-1 rounded-lg transition-colors duration-100"
+            :class="{
+              'bg-indigo-50 text-indigo-700 font-semibold': c.slug === activeCity,
+              'hover:bg-slate-100': c.slug !== activeCity
+            }"
             @click="$emit('select-city', c.slug)"
           >
             {{ c.name }}
@@ -32,6 +41,7 @@
         </li>
       </ul>
     </div>
+
 
     <!-- Разделы (= surveys этой волны) -->
     <div class="bg-white rounded-2xl shadow p-3">

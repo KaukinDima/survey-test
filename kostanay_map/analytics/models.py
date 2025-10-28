@@ -67,7 +67,7 @@ class Question(models.Model):
     A single question (belongs to a Survey).
     """
     survey = models.ForeignKey(Survey, on_delete=models.CASCADE, related_name="questions")
-    code = models.CharField(max_length=50)  # Q12, etc.
+    code = models.CharField(max_length=50, null=True, blank=True,)  # Q12, etc.
     text = models.TextField()
     category = models.CharField(max_length=50, blank=True, default="")  # 'media', 'wellbeing', ...
     sort_order = models.IntegerField(default=0)
@@ -82,7 +82,7 @@ class Question(models.Model):
 
 class AnswerOption(models.Model):
     question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name="options")
-    code = models.CharField(max_length=50, blank=True, default="")
+    code = models.CharField(max_length=50, null=True, blank=True, default="")
     label = models.CharField(max_length=255)
     sort_order = models.IntegerField(default=0)
 
@@ -98,7 +98,7 @@ class Metric(models.Model):
     Generic metrics for DataPoint: percent|count|index
     Example codes: 'media_tv', 'media_internet', 'wellbeing_index'
     """
-    code = models.CharField(max_length=80, unique=True)
+    code = models.CharField(max_length=80, null=True, blank=True,)
     name = models.CharField(max_length=255)
     unit = models.CharField(max_length=16, default="percent")  # percent|count|index
 

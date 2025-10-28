@@ -43,3 +43,10 @@ export async function searchQuestions({ surveyId, q }) {
   return await res.json();
 }
 
+export async function fetchGroupedQuestions(params = {}) {
+  const { wave, survey_id, city } = params;
+  const url = `${API_BASE.question}grouped/`;
+  const res = await axios.get(url, { params: { wave, survey_id, city } });
+  return res.data;
+}
+
